@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Banking App – Observer / Strategy / Command</title>
+  <style>
+    body{font-family:sans-serif;background:#f8f9fa;margin:0}
+    header{background:#4f46e5;color:#fff;padding:15px}
+    .container{max-width:1000px;margin:20px auto;padding:15px;background:#fff;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.08)}
+    .row{display:flex;gap:20px}
+    .col{flex:1}
+    label{display:block;margin:8px 0 4px}
+    input,select,button{padding:6px 8px;margin-bottom:8px}
+    .account{padding:6px;border:1px solid #ccc;margin-bottom:4px;border-radius:6px}
+    .notifications,.commands{max-height:160px;overflow:auto;background:#fefcf3;padding:8px;border:1px solid #eee;border-radius:6px}
+    button{cursor:pointer}
+  </style>
+</head>
+<body>
+<header>
+  <h1>Banking App – Observer / Strategy / Command</h1>
+</header>
+
+<div class="container">
+  <div class="row">
+    <div class="col">
+      <h3>Create Account</h3>
+      <label>Owner <input id="owner"></label>
+      <label>Type
+        <select id="type">
+          <option value="savings">Savings</option>
+          <option value="current">Current</option>
+          <option value="fixed">Fixed Deposit</option>
+        </select>
+      </label>
+      <label>Initial Balance <input id="balance" type="number" value="1000"></label>
+      <button id="create">Create</button>
+
+      <h3>Operations</h3>
+      <label>From <select id="from"></select></label>
+      <label>To <select id="to"></select></label>
+      <label>Amount <input id="amount" type="number" value="100"></label><br>
+      <button id="deposit">Deposit</button>
+      <button id="withdraw">Withdraw</button>
+      <button id="transfer">Transfer</button>
+      <button id="interest">Apply Interest</button>
+      <button id="undo">Undo Last</button>
+
+      <h3>Accounts</h3>
+      <div id="accounts"></div>
+    </div>
+
+    <div class="col">
+      <h3>Notifications (Observer)</h3>
+      <div class="notifications" id="notifications"></div>
+
+      <h3>Command History</h3>
+      <div class="commands" id="cmdlog"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Observer: NotificationService
+class NotificationService {
+  constructor() { this.messages=[]; this.el=document.getElementById('notifications'); }
+  notify(msg){
+    const full=[${new Date().toLocaleTimeString()}] ${msg};
+    this.messages.unshift(full);
+    this.render();
+  }
+  render(){ this.el.innerHTML=this.messages.map(m=><div>${m}</div>).join(''); }
+}
+const notifier=new NotificationService();
+
+// Account (Subject)
+let nextId=1;
+class Account {
+  constructor(owner,type,balance){
+    this.id=nextId++;
+    this.owner=owner; this.type=type; this.balance=+balance; this.observers=[];
+    this.attach(msg=>notifier.notify(Acct#${this.id} (${this.owner}): ${msg}));
+  }
+  attach(fn){this.observers.push(fn);}
+  notifyObservers(msg){this.observers.forEach(o=>o(msg));}
+  deposit(amt){if(amt<=0)throw Error("Invalid amount");this.balance+=amt;this.notifyObservers(Deposit +${amt}; Balance=${this.balance});}
+  withdraw(amt){if(amt<=0)throw Error("Invalid amount");if(amt>this.balance)throw Error("Insufficient");this.balance-=amt;this.notifyObservers(Withdraw -${amt}; Balance=${this.balance});}
+}
+
+// Strategy: interest calculators
+class SavingsInterest{calculate(a){return a.balance*0.03;}}
+class CurrentInterest{calculate(a){return 0;}}
+class FixedInterest{calculate(a){return a.balance*0.06;}}
+function getStrategy(a){
+  return a.type==='savings'?new SavingsInterest():
+         a.type==='fixed'?new FixedInterest():
+         new CurrentInterest();
+}
+
+// Command Pattern
+class Command{execute(){} undo(){} toString(){return 'Command';}}
+class DepositCommand extends Command{
+  constructor(account,amt){super();this.a=account;this.amt=amt;}
+  execute(){this.a.deposit(this.amt);} undo(){this.a.withdraw(this.amt);}
+  toString(){return Deposit ${this.amt} -> #${this.a.id};}
+}
+class WithdrawCommand extends Command{
+  constructor(account,amt){super();this.a=account;this.amt=amt;}
+  execute(){this.a.withdraw(this.amt);} undo(){this.a.deposit(this.amt);}
+  toString(){return Withdraw ${this.amt} from #${this.a.id};}
+}
+class TransferCommand extends Command{
+  constructor(from,to,amt){super();this.f=from;this.t=to;this.amt=amt;}
+  execute(){this.f.withdraw(this.amt);this.t.deposit(this.amt);}
+  undo(){this.t.withdraw(this.amt);this.f.deposit(this.amt);}
+  toString(){return Transfer ${this.amt} #${this.f.id}->#${this.t.id};}
+}
+class CommandManager{
+  constructor(){this.history=[];this.log=document.getElementById('cmdlog');}
+  execute(c){try{c.execute();this.history.push(c);this.logIt();}catch(e){notifier.notify('Command failed: '+e.message);}}
+  undo(){const c=this.history.pop();if(!c)return notifier.notify('Nothing to undo');try{c.undo();notifier.notify('Undid: '+c.toString());this.logIt();}catch(e){notifier.notify('Undo failed: '+e.message);}}
+  logIt(){this.log.innerHTML=this.history.slice().reverse().map(c=><div>${c.toString()}</div>).join('');}
+}
+const cmdManager=new CommandManager();
+
+// Bank container
+const bank={accounts:[],addAccount(o,t,b){const a=new Account(o,t,b);this.accounts.push(a);renderAccounts();return a;},find(id){return this.accounts.find(a=>a.id==id);}};
+
+// UI rendering
+function renderAccounts(){
+  const list=document.getElementById('accounts'), from=document.getElementById('from'), to=document.getElementById('to');
+  list.innerHTML=''; from.innerHTML=''; to.innerHTML='';
+  bank.accounts.forEach(a=>{
+    list.innerHTML+=<div class='account'><b>#${a.id}</b> ${a.owner} | ${a.type} | Bal=${a.balance}</div>;
+    const opt=<option value='${a.id}'>#${a.id}-${a.owner}</option>;
+    from.insertAdjacentHTML('beforeend',opt);to.insertAdjacentHTML('beforeend',opt);
+  });
+}
+
+// initial accounts
+bank.addAccount('Alice','savings',1200);
+bank.addAccount('Bob','current',400);
+bank.addAccount('Carl','fixed',10000);
+
+// UI handlers
+document.getElementById('create').onclick=()=>{
+  const o=document.getElementById('owner').value||'Unnamed';
+  const t=document.getElementById('type').value;
+  const b=document.getElementById('balance').value;
+  bank.addAccount(o,t,b);
+  notifier.notify(Created account for ${o});
+};
+function sel(id){return bank.find(document.getElementById(id).value);}
+document.getElementById('deposit').onclick=()=>{const a=sel('from');const amt=+document.getElementById('amount').value;cmdManager.execute(new DepositCommand(a,amt));renderAccounts();};
+document.getElementById('withdraw').onclick=()=>{const a=sel('from');const amt=+document.getElementById('amount').value;cmdManager.execute(new WithdrawCommand(a,amt));renderAccounts();};
+document.getElementById('transfer').onclick=()=>{const f=sel('from');const t=sel('to');const amt=+document.getElementById('amount').value;if(f.id===t.id)return notifier.notify('Choose different accounts');cmdManager.execute(new TransferCommand(f,t,amt));renderAccounts();};
+document.getElementById('interest').onclick=()=>{const a=sel('from');const s=getStrategy(a);const i=s.calculate(a);if(i>0){cmdManager.execute(new DepositCommand(a,i));notifier.notify(Applied interest ${i.toFixed(2)} to #${a.id});renderAccounts();}else notifier.notify('No interest for this account');};
+document.getElementById('undo').onclick=()=>{cmdManager.undo();renderAccounts();};
+</script>
+</body>
+</html>
