@@ -1,162 +1,296 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1.0">
-  <title>Banking App – Observer / Strategy / Command</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Simple Bank — Demo</title>
+  <meta name="description" content="A single-file demo banking website with accounts overview, transfer form and transaction history." />
   <style>
-    body{font-family:sans-serif;background:#f8f9fa;margin:0}
-    header{background:#4f46e5;color:#fff;padding:15px}
-    .container{max-width:1000px;margin:20px auto;padding:15px;background:#fff;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.08)}
-    .row{display:flex;gap:20px}
-    .col{flex:1}
-    label{display:block;margin:8px 0 4px}
-    input,select,button{padding:6px 8px;margin-bottom:8px}
-    .account{padding:6px;border:1px solid #ccc;margin-bottom:4px;border-radius:6px}
-    .notifications,.commands{max-height:160px;overflow:auto;background:#fefcf3;padding:8px;border:1px solid #eee;border-radius:6px}
-    button{cursor:pointer}
+    :root{
+      --bg:#f6f8fb;
+      --card:#ffffff;
+      --muted:#6b7280;
+      --accent:#0f62fe;
+      --success:#16a34a;
+      --danger:#dc2626;
+      --radius:12px;
+      --glass: rgba(255,255,255,0.6);
+      font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:linear-gradient(180deg,var(--bg),#eef3fb);color:#0f172a;line-height:1.45}
+    .container{max-width:1100px;margin:28px auto;padding:18px}
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+    .brand{display:flex;gap:12px;align-items:center}
+    .logo{width:48px;height:48px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#7c3aed);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700}
+    nav a{margin-left:14px;color:var(--muted);text-decoration:none;font-weight:600}
+    main{display:grid;grid-template-columns:1fr 360px;gap:18px}
+    @media (max-width:880px){main{grid-template-columns:1fr} .right{order:2}}
+
+    /* left column */
+    .card{background:var(--card);border-radius:var(--radius);box-shadow:0 6px 18px rgba(16,24,40,0.06);padding:18px}
+    .hero{display:flex;justify-content:space-between;align-items:center;gap:12px}
+    .hero h1{margin:0;font-size:20px}
+    .balance{font-size:28px;font-weight:700}
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px}
+    @media (max-width:640px){.grid{grid-template-columns:repeat(2,1fr)}}
+    .small-card{padding:12px;border-radius:10px;background:linear-gradient(180deg,var(--glass),rgba(255,255,255,0.9));}
+    .muted{color:var(--muted);font-size:13px}
+
+    /* right column */
+    .right{display:flex;flex-direction:column;gap:14px}
+    .transfer form{display:flex;flex-direction:column;gap:10px}
+    label{font-size:13px;color:var(--muted)}
+    input,select{padding:10px;border-radius:8px;border:1px solid #e6e9ef;font-size:14px}
+    button{background:var(--accent);color:#fff;border:0;padding:10px 14px;border-radius:10px;font-weight:700;cursor:pointer}
+    button.secondary{background:transparent;color:var(--accent);border:1px solid rgba(15,98,254,0.12)}
+
+    table{width:100%;border-collapse:collapse;margin-top:10px}
+    th,td{padding:10px;border-bottom:1px solid #f1f5f9;text-align:left;font-size:14px}
+    th{color:var(--muted);font-weight:600}
+    .txn-positive{color:var(--success);font-weight:700}
+    .txn-negative{color:var(--danger);font-weight:700}
+
+    footer{margin-top:18px;text-align:center;color:var(--muted);font-size:13px}
+    .help{font-size:13px;color:var(--muted);margin-top:8px}
+    .small{font-size:12px;color:var(--muted)}
   </style>
 </head>
 <body>
-<header>
-  <h1>Banking App – Observer / Strategy / Command</h1>
-</header>
+  <div class="container">
+    <header>
+      <div class="brand">
+        <div class="logo">SB</div>
+        <div>
+          <div style="font-weight:800">SimpleBank</div>
+          <div class="small muted">Secure · Fast · Demo</div>
+        </div>
+      </div>
+      <nav aria-label="Top Navigation">
+        <a href="#accounts">Accounts</a>
+        <a href="#transfer">Transfer</a>
+        <a href="#history">History</a>
+        <a href="#support">Support</a>
+      </nav>
+    </header>
 
-<div class="container">
-  <div class="row">
-    <div class="col">
-      <h3>Create Account</h3>
-      <label>Owner <input id="owner"></label>
-      <label>Type
-        <select id="type">
-          <option value="savings">Savings</option>
-          <option value="current">Current</option>
-          <option value="fixed">Fixed Deposit</option>
-        </select>
-      </label>
-      <label>Initial Balance <input id="balance" type="number" value="1000"></label>
-      <button id="create">Create</button>
+    <main>
+      <section>
+        <div class="card hero" aria-labelledby="welcome">
+          <div>
+            <h1 id="welcome">Welcome back, <span id="userName">Alex</span></h1>
+            <div class="muted">Here's a quick overview of your accounts</div>
+          </div>
+          <div style="text-align:right">
+            <div class="muted">Total balance</div>
+            <div class="balance" id="totalBalance">₹0.00</div>
+          </div>
+        </div>
 
-      <h3>Operations</h3>
-      <label>From <select id="from"></select></label>
-      <label>To <select id="to"></select></label>
-      <label>Amount <input id="amount" type="number" value="100"></label><br>
-      <button id="deposit">Deposit</button>
-      <button id="withdraw">Withdraw</button>
-      <button id="transfer">Transfer</button>
-      <button id="interest">Apply Interest</button>
-      <button id="undo">Undo Last</button>
+        <div class="grid" style="margin-top:16px">
+          <div class="card small-card" id="accountList">
+            <div class="muted">Accounts</div>
+            <div id="accountsContainer" style="margin-top:8px;display:flex;flex-direction:column;gap:10px">
+              <!-- accounts inserted by JS -->
+            </div>
+          </div>
 
-      <h3>Accounts</h3>
-      <div id="accounts"></div>
-    </div>
+          <div class="card small-card">
+            <div class="muted">Recent transactions</div>
+            <div style="margin-top:10px">
+              <table aria-describedby="Recent activity">
+                <thead><tr><th>Date</th><th>Details</th><th>Amount</th></tr></thead>
+                <tbody id="recentTx">
+                  <!-- rows inserted by JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
 
-    <div class="col">
-      <h3>Notifications (Observer)</h3>
-      <div class="notifications" id="notifications"></div>
+          <div class="card small-card">
+            <div class="muted">Quick links</div>
+            <ul style="margin:10px 0 0 14px;color:var(--muted)">
+              <li>Download statement (PDF)</li>
+              <li>Manage beneficiaries</li>
+              <li>Set up auto-pay</li>
+            </ul>
+          </div>
+        </div>
 
-      <h3>Command History</h3>
-      <div class="commands" id="cmdlog"></div>
-    </div>
+        <div class="card" style="margin-top:16px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div><strong>Transactions</strong><div class="muted">All activity for the past 30 days</div></div>
+            <div class="small muted">Showing latest 10</div>
+          </div>
+          <div style="margin-top:12px;overflow:auto">
+            <table>
+              <thead><tr><th>Date</th><th>Type</th><th>From</th><th>To</th><th>Amount</th></tr></thead>
+              <tbody id="txnTable">
+                <!-- full transactions by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <aside class="right">
+        <div class="card transfer" id="transfer">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div><strong>Make a transfer</strong><div class="muted">Instant transfers between your accounts</div></div>
+            <div class="small muted">Demo</div>
+          </div>
+
+          <form id="transferForm" onsubmit="return false" aria-label="Transfer form">
+            <div>
+              <label for="fromAcct">From</label>
+              <select id="fromAcct" required></select>
+            </div>
+            <div>
+              <label for="toAcct">To</label>
+              <select id="toAcct" required></select>
+            </div>
+            <div>
+              <label for="amount">Amount (₹)</label>
+              <input id="amount" type="number" step="0.01" min="1" required />
+            </div>
+            <div>
+              <label for="note">Note (optional)</label>
+              <input id="note" type="text" maxlength="80" placeholder="For eg. Rent, Gift" />
+            </div>
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button id="sendBtn">Send</button>
+              <button type="button" class="secondary" id="resetBtn">Reset</button>
+            </div>
+            <div class="help" id="txHelp"></div>
+          </form>
+        </div>
+
+        <div class="card">
+          <div><strong>Account summary</strong></div>
+          <div class="muted small" style="margin-top:8px">Balances update instantly when you make demo transfers.</div>
+          <div style="margin-top:12px">
+            <div class="muted">Savings interest rate</div>
+            <div style="font-weight:700">3.5% p.a.</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <strong>Support</strong>
+          <div class="muted" style="margin-top:8px">Call: 1800-555-0100</div>
+          <div class="muted">Email: support@simplebank.demo</div>
+          <div style="margin-top:12px"><button id="contactBtn" class="secondary">Contact support</button></div>
+        </div>
+      </aside>
+    </main>
+
+    <footer>
+      <div>© SimpleBank — Demo site. This is a client-side demo for learning purposes only.</div>
+    </footer>
   </div>
-</div>
 
-<script>
-// Observer: NotificationService
-class NotificationService {
-  constructor() { this.messages=[]; this.el=document.getElementById('notifications'); }
-  notify(msg){
-    const full=[${new Date().toLocaleTimeString()}] ${msg};
-    this.messages.unshift(full);
-    this.render();
-  }
-  render(){ this.el.innerHTML=this.messages.map(m=><div>${m}</div>).join(''); }
-}
-const notifier=new NotificationService();
+  <script>
+    // Demo data — in a real app this comes from a server
+    const user = {name:'Alex'}
+    const accounts = [
+      {id:'A1', name:'Savings Account', number:'XXXX-1234', balance: 45200.75},
+      {id:'A2', name:'Salary Account', number:'XXXX-5678', balance: 125000.00},
+      {id:'A3', name:'Fixed Deposit', number:'XXXX-9012', balance: 250000.00}
+    ];
 
-// Account (Subject)
-let nextId=1;
-class Account {
-  constructor(owner,type,balance){
-    this.id=nextId++;
-    this.owner=owner; this.type=type; this.balance=+balance; this.observers=[];
-    this.attach(msg=>notifier.notify(Acct#${this.id} (${this.owner}): ${msg}));
-  }
-  attach(fn){this.observers.push(fn);}
-  notifyObservers(msg){this.observers.forEach(o=>o(msg));}
-  deposit(amt){if(amt<=0)throw Error("Invalid amount");this.balance+=amt;this.notifyObservers(Deposit +${amt}; Balance=${this.balance});}
-  withdraw(amt){if(amt<=0)throw Error("Invalid amount");if(amt>this.balance)throw Error("Insufficient");this.balance-=amt;this.notifyObservers(Withdraw -${amt}; Balance=${this.balance});}
-}
+    let transactions = [
+      {date:'2025-09-18',type:'Debit',from:'Salary Account',to:'Grocery Store',amount:-1250.00},
+      {date:'2025-09-14',type:'Credit',from:'Employer',to:'Salary Account',amount:45000.00},
+      {date:'2025-09-10',type:'Debit',from:'Savings Account',to:'Electricity',amount:-320.50}
+    ];
 
-// Strategy: interest calculators
-class SavingsInterest{calculate(a){return a.balance*0.03;}}
-class CurrentInterest{calculate(a){return 0;}}
-class FixedInterest{calculate(a){return a.balance*0.06;}}
-function getStrategy(a){
-  return a.type==='savings'?new SavingsInterest():
-         a.type==='fixed'?new FixedInterest():
-         new CurrentInterest();
-}
+    // helpers
+    const fmt = n => {
+      return '₹' + n.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2});
+    }
 
-// Command Pattern
-class Command{execute(){} undo(){} toString(){return 'Command';}}
-class DepositCommand extends Command{
-  constructor(account,amt){super();this.a=account;this.amt=amt;}
-  execute(){this.a.deposit(this.amt);} undo(){this.a.withdraw(this.amt);}
-  toString(){return Deposit ${this.amt} -> #${this.a.id};}
-}
-class WithdrawCommand extends Command{
-  constructor(account,amt){super();this.a=account;this.amt=amt;}
-  execute(){this.a.withdraw(this.amt);} undo(){this.a.deposit(this.amt);}
-  toString(){return Withdraw ${this.amt} from #${this.a.id};}
-}
-class TransferCommand extends Command{
-  constructor(from,to,amt){super();this.f=from;this.t=to;this.amt=amt;}
-  execute(){this.f.withdraw(this.amt);this.t.deposit(this.amt);}
-  undo(){this.t.withdraw(this.amt);this.f.deposit(this.amt);}
-  toString(){return Transfer ${this.amt} #${this.f.id}->#${this.t.id};}
-}
-class CommandManager{
-  constructor(){this.history=[];this.log=document.getElementById('cmdlog');}
-  execute(c){try{c.execute();this.history.push(c);this.logIt();}catch(e){notifier.notify('Command failed: '+e.message);}}
-  undo(){const c=this.history.pop();if(!c)return notifier.notify('Nothing to undo');try{c.undo();notifier.notify('Undid: '+c.toString());this.logIt();}catch(e){notifier.notify('Undo failed: '+e.message);}}
-  logIt(){this.log.innerHTML=this.history.slice().reverse().map(c=><div>${c.toString()}</div>).join('');}
-}
-const cmdManager=new CommandManager();
+    function render() {
+      document.getElementById('userName').textContent = user.name;
+      const total = accounts.reduce((s,a)=>s+a.balance,0);
+      document.getElementById('totalBalance').textContent = fmt(total);
 
-// Bank container
-const bank={accounts:[],addAccount(o,t,b){const a=new Account(o,t,b);this.accounts.push(a);renderAccounts();return a;},find(id){return this.accounts.find(a=>a.id==id);}};
+      const acctsCont = document.getElementById('accountsContainer');
+      acctsCont.innerHTML = '';
+      accounts.forEach(a=>{
+        const el = document.createElement('div');
+        el.style.display='flex';el.style.justifyContent='space-between';el.style.alignItems='center';
+        el.innerHTML = `<div><div style="font-weight:700">${a.name}</div><div class="muted small">${a.number}</div></div><div style="text-align:right"><div style="font-weight:700">${fmt(a.balance)}</div></div>`;
+        acctsCont.appendChild(el);
+      });
 
-// UI rendering
-function renderAccounts(){
-  const list=document.getElementById('accounts'), from=document.getElementById('from'), to=document.getElementById('to');
-  list.innerHTML=''; from.innerHTML=''; to.innerHTML='';
-  bank.accounts.forEach(a=>{
-    list.innerHTML+=<div class='account'><b>#${a.id}</b> ${a.owner} | ${a.type} | Bal=${a.balance}</div>;
-    const opt=<option value='${a.id}'>#${a.id}-${a.owner}</option>;
-    from.insertAdjacentHTML('beforeend',opt);to.insertAdjacentHTML('beforeend',opt);
-  });
-}
+      // populate selects
+      const from = document.getElementById('fromAcct');
+      const to = document.getElementById('toAcct');
+      from.innerHTML = '';
+      to.innerHTML = '';
+      accounts.forEach(a=>{
+        const opt1 = document.createElement('option'); opt1.value=a.id; opt1.textContent=`${a.name} — ${a.number}`;
+        const opt2 = opt1.cloneNode(true);
+        from.appendChild(opt1);
+        to.appendChild(opt2);
+      });
 
-// initial accounts
-bank.addAccount('Alice','savings',1200);
-bank.addAccount('Bob','current',400);
-bank.addAccount('Carl','fixed',10000);
+      // recent tx
+      const recent = document.getElementById('recentTx'); recent.innerHTML='';
+      transactions.slice(0,5).forEach(t=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${t.date}</td><td>${t.from}</td><td class="${t.amount>0? 'txn-positive':'txn-negative'}">${fmt(t.amount)}</td>`;
+        recent.appendChild(tr);
+      });
 
-// UI handlers
-document.getElementById('create').onclick=()=>{
-  const o=document.getElementById('owner').value||'Unnamed';
-  const t=document.getElementById('type').value;
-  const b=document.getElementById('balance').value;
-  bank.addAccount(o,t,b);
-  notifier.notify(Created account for ${o});
-};
-function sel(id){return bank.find(document.getElementById(id).value);}
-document.getElementById('deposit').onclick=()=>{const a=sel('from');const amt=+document.getElementById('amount').value;cmdManager.execute(new DepositCommand(a,amt));renderAccounts();};
-document.getElementById('withdraw').onclick=()=>{const a=sel('from');const amt=+document.getElementById('amount').value;cmdManager.execute(new WithdrawCommand(a,amt));renderAccounts();};
-document.getElementById('transfer').onclick=()=>{const f=sel('from');const t=sel('to');const amt=+document.getElementById('amount').value;if(f.id===t.id)return notifier.notify('Choose different accounts');cmdManager.execute(new TransferCommand(f,t,amt));renderAccounts();};
-document.getElementById('interest').onclick=()=>{const a=sel('from');const s=getStrategy(a);const i=s.calculate(a);if(i>0){cmdManager.execute(new DepositCommand(a,i));notifier.notify(Applied interest ${i.toFixed(2)} to #${a.id});renderAccounts();}else notifier.notify('No interest for this account');};
-document.getElementById('undo').onclick=()=>{cmdManager.undo();renderAccounts();};
-</script>
+      // full txn table
+      const table = document.getElementById('txnTable'); table.innerHTML='';
+      transactions.forEach(t=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${t.date}</td><td>${t.type}</td><td>${t.from}</td><td>${t.to}</td><td class="${t.amount>0? 'txn-positive':'txn-negative'}">${fmt(t.amount)}</td>`;
+        table.appendChild(tr);
+      });
+    }
+
+    // form logic
+    document.getElementById('sendBtn').addEventListener('click',()=>{
+      const fromId = document.getElementById('fromAcct').value;
+      const toId = document.getElementById('toAcct').value;
+      const amt = parseFloat(document.getElementById('amount').value);
+      const note = document.getElementById('note').value.trim();
+      const help = document.getElementById('txHelp');
+      help.textContent='';
+
+      if(!fromId || !toId){ help.textContent='Please select both accounts.'; return }
+      if(fromId===toId){ help.textContent='Choose two different accounts.'; return }
+      if(!amt || amt<=0){ help.textContent='Enter a valid amount.'; return }
+
+      const fromAcct = accounts.find(a=>a.id===fromId);
+      const toAcct = accounts.find(a=>a.id===toId);
+      if(amt > fromAcct.balance){ help.textContent='Insufficient funds in the source account.'; return }
+
+      // perform transfer (demo only)
+      fromAcct.balance = +(fromAcct.balance - amt).toFixed(2);
+      toAcct.balance = +(toAcct.balance + amt).toFixed(2);
+      const today = new Date();
+      const dateStr = today.toISOString().slice(0,10);
+      transactions.unshift({date:dateStr, type:'Transfer', from:fromAcct.name, to:toAcct.name, amount:-amt});
+      transactions.unshift({date:dateStr, type:'Transfer', from:fromAcct.name, to:toAcct.name, amount:amt});
+
+      help.textContent = 'Transfer successful (demo).';
+      render();
+    });
+
+    document.getElementById('resetBtn').addEventListener('click',()=>{
+      document.getElementById('transferForm').reset();
+      document.getElementById('txHelp').textContent='';
+    });
+
+    document.getElementById('contactBtn').addEventListener('click',()=>{
+      alert('Contacting support... (demo)');
+    });
+
+    // initialize
+    render();
+  </script>
 </body>
 </html>
